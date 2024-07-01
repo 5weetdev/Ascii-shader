@@ -1,25 +1,14 @@
-#version 150
-#extension GL_ARB_explicit_attrib_location : enable
+#version 120
 
-uniform float alphaTestRef;
-uniform int renderStage;
 uniform sampler2D lightmap;
 
-in vec2 lmcoord;
-in vec4 tint;
-
-/* DRAWBUFFERS:0 */
-layout(location = 0) out vec4 colortex0Out;
+varying vec2 lmcoord;
+varying vec4 glcolor;
 
 void main() {
-	vec4 color = tint;
-	if (color.a < alphaTestRef) discard;
-	//leads have light levels, but chunk borders don't.
-	//and for whatever reason, chunk borders use gbuffers_basic
-	//instead of gbuffers_lines, so we detect them with renderStage.
-	if (renderStage != MC_RENDER_STAGE_DEBUG) {
-		color *= texture(lightmap, lmcoord);
-	}
+	vec4 color = glcolor;
+	color *= texture2D(lightmap, lmcoord);
 
-	colortex0Out = color;
+/* DRAWBUFFERS:0 */
+	gl_FragData[0] = color; //gcolor
 }

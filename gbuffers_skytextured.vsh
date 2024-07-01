@@ -1,18 +1,10 @@
-#version 150
+#version 120
 
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
-uniform mat4 textureMatrix = mat4(1.0);
-
-in vec2 vaUV0;
-in vec3 vaPosition;
-in vec4 vaColor;
-
-out vec2 texcoord;
-out vec4 tint;
+varying vec2 texcoord;
+varying vec4 glcolor;
 
 void main() {
-	gl_Position = projectionMatrix * (modelViewMatrix * vec4(vaPosition, 1.0));
-	texcoord    = (textureMatrix * vec4(vaUV0, 0.0, 1.0)).xy;
-	tint        = vaColor;
+	gl_Position = ftransform();
+	texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+	glcolor = gl_Color;
 }

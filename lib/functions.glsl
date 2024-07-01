@@ -1,43 +1,75 @@
-vec3 rgb(vec3 color){
-    return vec3(color.x / 255.0, color.y / 255.0, color.z / 255.0);
+// Precomputed Gaussian kernels
+const float gaussian1[9] = float[](
+    0.0947416, 0.118318, 0.0947416,
+    0.118318, 0.147761, 0.118318,
+    0.0947416, 0.118318, 0.0947416
+);
+
+const float gaussian2[9] = float[](
+    0.0162162, 0.0540540, 0.0162162,
+    0.0540540, 0.1216216, 0.0540540,
+    0.0162162, 0.0540540, 0.0162162
+);
+
+// Precomputed Sobel kernels
+const float sobelX[9] = float[](
+    -1.0, 0.0, 1.0,
+    -2.0, 0.0, 2.0,
+    -1.0, 0.0, 1.0
+);
+
+const float sobelY[9] = float[](
+    -1.0, -2.0, -1.0,
+     0.0,  0.0,  0.0,
+     1.0,  2.0,  1.0
+);
+
+float LinearizeDepth(float depth) {
+    float z = depth * 2.0 - 1.0; // back to NDC 
+    return (2.0 * near * far) / (far + near - z * (far - near));
 }
 
-vec3 hue2rgb(float hue) {
-    hue = fract(hue); //only use fractional part of hue, making it loop
-    float r = abs(hue * 6 - 3) - 1; //red
-    float g = 2 - abs(hue * 6 - 2); //green
-    float b = 2 - abs(hue * 6 - 4); //blue
-    vec3 rgb = vec3(r,g,b); //combine components
-    rgb = clamp(rgb, 0.0, 1.0); //clamp between 0 and 1
-    return rgb;
+vec4 applyKernel(sampler2D tex, vec2 uv, float[9] kernel, bool linearizeDepth) {
+    vec2 texelSize = 1.0 / vec2(viewWidth, viewHeight);
+    vec4 result = vec4(0.0);
+    
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            vec2 offset = vec2(float(i), float(j)) * texelSize;
+            float value = texture2D(tex, uv + offset).r;
+            if (linearizeDepth) {
+                value = LinearizeDepth(value);
+            }
+            result += vec4(value) * kernel[(i + 1) * 3 + (j + 1)];
+        }
+    }
+    
+    return result;
 }
 
-vec3 hsb2rgb(vec3 c ){
-    vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),
-                             6.0)-3.0)-1.0,
-                     0.0,
-                     1.0 );
-    rgb = rgb*rgb*(3.0-2.0*rgb);
-    return c.z * mix( vec3(1.0), rgb, c.y);
+vec2 applySobel(sampler2D tex, vec2 uv, bool linearizeDepth) {
+    float gx = dot(applyKernel(tex, uv, sobelX, linearizeDepth).rgb, vec3(0.299, 0.587, 0.114));
+    float gy = dot(applyKernel(tex, uv, sobelY, linearizeDepth).rgb, vec3(0.299, 0.587, 0.114));
+    return vec2(gx, gy);
 }
 
-vec3 rgb2hsv(vec3 c)
-{
-    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-
-    float d = q.x - min(q.w, q.y);
-    float e = 1.0e-10;
-    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+vec4 applyDoG(sampler2D tex, vec2 uv) {
+    return applyKernel(tex, uv, gaussian1, false) - applyKernel(tex, uv, gaussian2, false);
 }
 
- 
-
-// All components are in the range [0…1], including hue.
-vec3 hsv2rgb(vec3 c)
-{
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+vec3 quantizeColor(vec3 color, float steps) {
+    // Ensure steps is at least 2 to avoid division by zero
+    steps = max(steps, 2.0);
+    
+    // Calculate the step size
+    float stepSize = 1.0 / (steps - 1.0);
+    
+    // Quantize each channel
+    vec3 quantized;
+    quantized.r = round(color.r / stepSize) * stepSize;
+    quantized.g = round(color.g / stepSize) * stepSize;
+    quantized.b = round(color.b / stepSize) * stepSize;
+    
+    // Clamp the result to [0, 1] range
+    return clamp(quantized, 0.0, 1.0);
 }
