@@ -1,3 +1,20 @@
+//            _____  _____ _____ _____                       
+//     /\    / ____|/ ____|_   _|_   _|                      
+//    /  \  | (___ | |      | |   | |                        
+//   / /\ \  \___ \| |      | |   | |                        
+//  / ____ \ ____) | |____ _| |_ _| |_                       
+// /_/    \_\_____/_\_____|_____|_____|  _      _            
+// | |           | ____|                | |    | |           
+// | |__  _   _  | |____      _____  ___| |_ __| | _____   __
+// | '_ \| | | | |___ \ \ /\ / / _ \/ _ \ __/ _` |/ _ \ \ / /
+// | |_) | |_| |  ___) \ V  V /  __/  __/ || (_| |  __/\ V / 
+// |_.__/ \__, | |____/ \_/\_/ \___|\___|\__\__,_|\___| \_/  
+//         __/ |                                             
+//        |___/                                              
+//
+// Feel free to change shader parameters and don't forget to
+// Star me on github: https://github.com/5weetdev/Ascii-shader :D
+
 #version 130
 #extension GL_ARB_explicit_attrib_location : enable
 
@@ -8,6 +25,10 @@ uniform sampler2D colortex0;
 uniform sampler2D colortex4;
 uniform sampler2D colortex5;
 uniform sampler2D colortex3;
+uniform sampler2D depthtex0;
+
+uniform float far;
+uniform float near;
 
 const float edgeThreshold = 0.05;
 
@@ -15,8 +36,9 @@ const float edgeThreshold = 0.05;
 
 in vec2 texcoord;
 
-/* DRAWBUFFERS:0 */
-layout(location = 0) out vec4 colortex0Out;
+/* DRAWBUFFERS:03 */
+out vec4 colortex0Out;
+out vec4 colortex3Out;
 
 
 vec3 quantizeColor(vec3 color, float steps) {
@@ -45,12 +67,23 @@ vec2 getMapping(int index) {
     return vec2(float(x), float(y));
 }
 
+//float linearize_depth(float d)
+//{
+//    float z_n = 2.0 * d - 1.0;
+//    return 2.0 * near * far / (far + near - z_n * (far - near));
+//}
 
 void main() {
 	vec2 texelSize = vec2(1.0 / viewWidth, 1.0 / viewHeight);
 	vec2 chars          = vec2(viewWidth  / FONT_WIDTH        , viewHeight  / FONT_HEIGHT);
 	vec2 nCharSize      = vec2(FONT_WIDTH / FONT_TEXTURE_WIDTH, FONT_HEIGHT / FONT_TEXTURE_HEIGHT); 
 	vec2 charsInTexture = vec2(FONT_TEXTURE_WIDTH / FONT_WIDTH, FONT_TEXTURE_HEIGHT / FONT_HEIGHT);
+
+    // Fog:
+    //float depth = texture(depthtex0, texcoord).r;
+    //float linearDepth = linearize_depth(depth);
+    //float fogFactor = clamp(exp(-0.001 * linearDepth * linearDepth), 0.0, 1.0);
+    //fogFactor = max(fogFactor, 0.2);
 
     vec2 edgesMapping[4];
     edgesMapping[0] = vec2(nCharSize.x * 14.0, nCharSize.y * 2.0);  
@@ -120,4 +153,6 @@ void main() {
     #else
     colortex0Out = vec4(charColor, 1.0);
     #endif
+
+    colortex3Out = vec4(texture(colortex0, texcoord).rgb, 1.0);
 }
